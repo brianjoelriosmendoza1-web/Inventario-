@@ -1,1 +1,76 @@
+name: Generar APK Inventario
 
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+
+      - name: Configurar Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Configurar Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Preparar aplicación
+        run: |
+          rm -rf app
+          mkdir app
+          unzip -o InventarioNegocio_Android.zip -d app
+          cd app
+
+          cat > package.json <<'EOF'
+          {
+            "name": "inventario-negocio",
+            "version": "1.0.0",
+            "private": true,
+            "dependencies": {
+              "@capacitor/core": "latest",
+              "@capacitor/android": "latest"
+            },
+            "devDependencies": {
+              "@capacitor/cli": "latest"
+            }
+          }
+          EOF
+
+          cat > capacitor.config.ts <<'EOF'
+          import type { CapacitorConfig } from '@capacitor/cli';
+
+          const config: CapacitorConfig = {
+            appId: 'com.inventarionegocio.app',
+            appName: 'Inventario Negocio',
+            webDir: '.'
+          };
+
+          export default config;
+          EOF
+
+          npm install
+          npx cap add android
+          npx cap sync android
+
+      - name: Generar APK
+        working-directory: app/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Guardar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: InventarioNegocio-APK
+          path: app/android/app/build/outputs/apk/debug/app-debug.apk
